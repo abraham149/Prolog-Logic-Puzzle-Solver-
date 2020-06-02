@@ -1,0 +1,322 @@
+%% To load all files:
+% [proyecto, kb, library(clpfd)].
+% proyecto (this one) holds all rules and constraints
+% kb: holds all given clues and matrices
+% library(clpfd) has useful rules used in this file
+
+
+%get length of list,
+%I got this from some page
+list_length(Xs,L) :-
+    list_length(Xs,0,L).
+list_length([], L, L).
+list_length([_|Xs], T, L) :-
+  T1 is T+1 ,
+  list_length(Xs,T1,L).
+
+
+getHead([H|_], H).
+
+
+orderStrings(X,Y,X,Y):-
+    X @< Y,
+    getLetterNumber(X,XL,_),
+    getLetterNumber(Y,YL,_),
+    (XL = 'a' ; YL = 'a'),
+    !.
+orderStrings(X,Y,Y,X):-
+    getLetterNumber(X,XL,_),
+    getLetterNumber(Y,YL,_),
+    (XL = 'a' ; YL = 'a'),!.
+
+orderStrings(X,Y,X,Y):- Y@<X,!.
+orderStrings(X,Y,Y,X).
+
+
+%Get letter and number from cell
+%use:
+%getLetterNumber(c2, A, B). -> A = c, B=2.
+getLetterNumber(X, H, T3):-
+    atom_chars(X, [H|T]),
+    getHead(T,T2),
+    atom_number(T2, T3).
+
+
+
+%Search through list
+on(H, [H|_]).
+on(H, [_|T]):-
+    on(H, T).
+
+
+%For generate a matrix of 0's and 1's
+fill_matrix(L):-
+    puzzleSize(N),
+    length(L, N),
+    maplist(fill_list, L).
+
+
+%Generate a list of 0's and 1's
+fill_list(L) :-
+    puzzleSize(N),
+    length(L, N),
+    maplist(between(0,1), L).
+
+
+%Get the sum of a list of numbers
+list_sum([], 0).
+list_sum([Item], Item).
+list_sum([Item1, Item2|Tail], Total):-
+    Sum is Item1+Item2,
+    list_sum([Sum|Tail], Total).
+
+%Check that a given list only has one value of 1,
+%and the rest are 0's
+validGrid(List):-
+    list_sum(List, 1).
+
+%Check for rows and columns that the sum is 1
+validMatrix(Grid):-
+    fill_matrix(Grid),
+    maplist(validGrid, Grid),
+    transpose(Grid, NewGrid),
+    maplist(validGrid, NewGrid).
+
+%Find a valid duo of letter A,B
+%such that there is a definition of
+%matrix[A,B,Matrix]
+validDuo([X,Y]):-
+    matrix([X,Y, _]).
+
+%Given both coord letters of matrix,
+%Get the whole array that matches a valid matrix
+getOneMatrix(A,B, [A,B,M]):-
+    matrix([A,B,M]), validMatrix(M).
+
+
+findMatrix([],[]).
+findMatrix([[A,B|_]|T], [X|Res]):-
+    getOneMatrix(A,B, X),
+    findMatrix(T,Res).
+
+%Check that for a true mark [A,B]
+% there is also a mark A,X or X,A such that
+% there is B,X or X,B,
+% inverse letter is because, excluding matrices with 'a',
+% the rest of matrices have letters inverted.
+hasMatch(List, [A,B|_]):-
+    on([A,X|_], List),
+    B \= X,
+    isOnList(List,[B,X|_]).
+    %write('checked'),
+    %write([B,X]).
+
+%Just write a list to console
+writeList([]).
+writeList([H|T]):-
+    write(H),
+    writeList(T).
+
+
+
+isOnList(List, [X,Y|_]):-
+    orderStrings(X,Y,A,B),
+    on([A,B|_], List),!.
+
+notOnList(List,  [X,Y|_]):-
+    not(isOnList(List,  [X,Y|_])).
+
+
+
+
+findDifferentsList(List, [X,Y]):-
+    on(X, List),
+    on(Y, List),
+    X\=Y.
+
+%Given list of matrices,
+%Get all of their solutions
+gatherResults([], []):-!.
+gatherResults([H|T], [Sols|Rest]):-
+    is_list(H),
+    listOfMarksMatrix(H, Sols),
+    gatherResults(T, Rest).
+
+
+%Find row index of true element in single list
+indexOf([1|_], 1):- !.
+indexOf([_|Tail], Index):-
+  indexOf(Tail, Index1),
+  !,
+  Index is Index1+1.
+
+
+%Get indieces x and y of true values of given matrix
+getTrueFromMatrix([H|_], 1, B1):-
+    is_list(H),
+    indexOf(H, B1).
+getTrueFromMatrix([_|T], A1, B1):-
+    is_list(T),
+    getTrueFromMatrix(T, A2, B1),
+    A1 is A2 + 1.
+
+
+%List all marks of given matrix
+listOfMarksMatrix([A,B,M|_], ListOfTrue):-
+    findall(X, matrixMarks([A,B,M|_],X), ListOfTrue).
+
+
+%Get coordinates of given matrix, includes letterNumber
+matrixMarks([A,B,M|_],[AX,BY]):-
+    matrix([A,B,M]),
+    getTrueFromMatrix(M, X,Y),
+    concat(A,X,AX),
+    concat(B,Y,BY).
+
+
+%From the list of solutions,
+%extract the ones containing 'a'
+comparableMarks([],[]).
+comparableMarks([H|T],[H|Res]):-
+    H = [A,_],
+    getLetterNumber(A,'a',_),
+    comparableMarks(T,Res),!.
+comparableMarks([_|T], Res):-
+    comparableMarks(T,Res).
+
+
+%_____________________________________
+
+genList(L):-
+    puzzleSize(S),
+    length(L,S),
+    maplist(between(1, S), L),
+    all_different(L).
+
+genMatrix([A,B|_],[A,B,Matrix]):-
+    genList(Matrix).
+
+findMatrixGroup([],[]).
+findMatrixGroup([H|T],[X|Res]):-
+    genMatrix(H,X),
+    findMatrixGroup(T, Res).
+
+
+solution(AllSolsList):-
+    findall(V, duo(V), List),
+    findMatrixGroup(List, Solution),
+    %checkTrue(Solution),
+    allDifferentSolutions(Solution),
+    checkEither3List(Solution),
+    checkEither4List(Solution),
+    checkMoreXList(Solution),
+    checkMoreList(Solution),
+    !,
+    maplist(solsList, Solution, AllSolsM),
+    append(AllSolsM, AllSolsList),
+    maplist(writeln, AllSolsList).
+    %writeList(Solution).
+
+
+trueMark(Solution, [C1, C2|_]):-
+    orderStrings(C1,C2, NC1, NC2),
+    getLetterNumber(NC1, 'a', N1),
+    getLetterNumber(NC2, L2, N2),
+    on(['a',L2,Grid|_], Solution),
+    nth1(N1, Grid, N2,_),!.
+trueMark(Solution, [C1, C2|_]):-
+    findAmark(Solution, C1, N1),
+    findAmark(Solution, C2, N1).
+falseMark(_, [C1, C2|_]):-
+    getLetterNumber(C1, L1,_),
+    getLetterNumber(C2, L1,_),!.
+falseMark(Solution, False):-
+    not(trueMark(Solution, False)).
+
+findAmark(Solution, Cell, Number):-
+    getLetterNumber(Cell, L, N),
+    on(['a', L, Grid|_], Solution),
+    nth1(Number, Grid, N, _).
+
+checkMoreSimple(Solution, [X,Y|_]):-
+    findAmark(Solution, X, NX),
+    findAmark(Solution, Y, NY),
+    NX > NY.
+
+checkMoreList(Solution):-
+    findall([X,Y], more(X,Y), AllMore),
+    maplist(checkMoreSimple(Solution), AllMore).
+
+
+%Find all isTrue and check
+%that a pair with it exists in the solution list
+checkTrue(List):-
+    findall([X,Y], isTrue(X,Y), AllTrue),
+    maplist(trueMark(List), AllTrue).
+
+
+checkMoreXSimple(Solution, [X,Y,Z|_]):-
+    findAmark(Solution, X, NX),
+    findAmark(Solution, Y, NY),
+    Compare is NY + Z,
+    Compare == NX.
+
+checkMoreXList(Solution):-
+    findall([X,Y,Z], moreX(X,Y,Z), AllMoreX),
+    maplist(checkMoreXSimple(Solution), AllMoreX).
+
+
+checkEither3Simple(Solution, [X, Y, Z|_]):-
+    falseMark(Solution, [Y,Z|_]),
+    (trueMark(Solution, [X,Y|_]);
+    trueMark(Solution, [X,Z|_])).
+
+%check all either X or Y
+checkEither3List(List):-
+    findall([X,Y,Z], either3(X,Y,Z), Either),
+    maplist(checkEither3Simple(List), Either).
+
+
+%check all either X or Y
+checkEither4List(List):-
+    findall([X,Y,Z,W], either4(X,Y,Z,W), Either),
+    maplist(checkEither4Simple(List), Either).
+
+
+checkEither4Simple(Solution, [X, Y, Z, W|_]):-
+    falseMark(Solution, [X,Y|_]),
+    checkEither3Simple(Solution, [X, Z, W|_]),
+    checkEither3Simple(Solution, [Y, Z, W|_]).
+
+
+matchDifferent(List, Res):-
+    on(List, A), on(List, B),
+    A\=B, orderStrings(A,B,NA,NB),
+    Res is [NA,NB].
+
+orderStringMark([A,B|_], [X,Y]):-
+    orderStrings(A,B, X, Y).
+
+allDifferentSolutions(Solution):-
+    findall(D, different(D), AllDifferent),
+    maplist(getDifferentFromList,AllDifferent, DiffList),
+    append(DiffList, AllDiffList),
+    maplist(orderStringMark, AllDiffList, List),
+    sort(List, OrderedDiffs),
+    maplist(falseMark(Solution), OrderedDiffs).
+
+
+getDifferentFromList(List, NewL):-
+    findall(Items, findDifferentsList(List, Items), NewL).
+
+
+getMarkMatrix([L1,L2,L|_], [A,B]):-
+    nth1(N1, L, N2, _),
+    concat(L1,N1,A),
+    concat(L2,N2,B).
+
+
+solsList(S, All):-
+    findall(M, getMarkMatrix(S, M), All).
+
+

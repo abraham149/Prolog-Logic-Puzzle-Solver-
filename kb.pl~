@@ -1,0 +1,18 @@
+
+dimensions(4).
+puzzleSize(5).
+
+duo(['a','b']).
+duo(['a','c']).
+duo(['a','d']).
+
+%isTrue('XX', 'XX').
+%either3('XX', 'XX', 'XX').
+%more('XX', 'XX').
+%moreX('XX', 'XX', 1).
+%either4('XX', 'XX', 'XX', 'XX').
+%different(['XX', 'XX', 'XX', 'XX']).
+
+
+
+
